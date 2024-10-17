@@ -1,0 +1,119 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: ABSA Liveness Detection Project
+
+Resources:
+  # S3 Bucket for storing images
+  ImageBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: absa-liveness-detection-images
+      AccessControl: Private
+
+  # Rekognition Collection
+  RekognitionCollection:
+    Type: AWS::Rekognition::Collection
+    Properties:
+      CollectionId: absa-liveness-detection-collection
+
+  # DynamoDB Table
+  UserTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: ABSA_Liveness_Detection_Users
+      AttributeDefinitions:
+        - AttributeName: UserID
+          AttributeType: S
+        - AttributeName: FaceID
+          AttributeType: S
+      KeySchema:
+        - AttributeName: UserID
+          KeyType: HASH
+        - AttributeName: FaceID
+          KeyType: RANGE
+      ProvisionedThroughput:
+        ReadCapacityUnits: 5
+        WriteCapacityUnits: 5
+
+  # IAM Role for Lambda Functions
+  LambdaExecutionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: LivenessDetectionPolicy
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - rekognition:SearchFacesByImage
+                  - rekognition:DetectFaces
+                  - rekognition:CreateFaceLivenessSession
+                  - rekognition:GetFaceLivenessSessionResults
+                  - rekognition:IndexFaces
+                  - dynamodb:PutItem
+                  - dynamodb:GetItem
+                  - dynamodb:UpdateItem
+                  - dynamodb:DeleteItem
+                  - s3:GetObject
+                  - ses:SendRawEmail
+                  - sns:Publish
+                Resource: '*'
+
+  # Lambda Function for Face Comparison and OTP
+  AbsacomparefacesFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      Handler: Absacomparefaces.lambda_handler
+      Runtime: python3.8
+      CodeUri: ./path/to/Absacomparefaces/
+      Role: !GetAtt LambdaExecutionRole.Arn
+      Environment:
+        DYNAMODB_TABLE: !Ref UserTable
+        S3_BUCKET: !Ref ImageBucket
+        REKOGNITION_COLLECTION: !Ref RekognitionCollection
+
+  # Lambda Function for User Registration
+  UserRegistrationFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      Handler: UserRegistration.lambda_handler
+      Runtime: python3.8
+      CodeUri: ./path/to/UserRegistration/
+      Role: !GetAtt LambdaExecutionRole.Arn
+      Environment:
+        DYNAMODB_TABLE: !Ref UserTable
+        S3_BUCKET: !Ref ImageBucket
+        REKOGNITION_COLLECTION: !Ref RekognitionCollection
+
+  # Lambda Function for Sending Emails
+  EmailSendingFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      Handler: EmailSending.lambda_handler
+      Runtime: python3.8
+      CodeUri: ./path/to/EmailSending/
+      Role: !GetAtt LambdaExecutionRole.Arn
+      Environment:
+        DYNAMODB_TABLE: !Ref UserTable
+        S3_BUCKET: !Ref ImageBucket
+        SES_SOURCE_EMAIL: 'kgodiso@paxdivitiae.com'  # replace with actual sender email
+
+Outputs:
+  ImageBucketName:
+    Description: S3 bucket name for storing images
+    Value: !Ref ImageBucket
+
+  RekognitionCollectionId:
+    Description: Rekognition collection ID
+    Value: !Ref RekognitionCollection
+
+  UserTableName:
+    Description: DynamoDB table name
+    Value: !Ref UserTable
