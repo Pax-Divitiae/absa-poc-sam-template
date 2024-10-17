@@ -103,7 +103,7 @@ Resources:
       Environment:
         DYNAMODB_TABLE: !Ref UserTable
         S3_BUCKET: !Ref ImageBucket
-        SES_SOURCE_EMAIL: 'kgodiso@paxdivitiae.com'  # replace with actual sender email
+        SES_SOURCE_EMAIL: 'example@example.com'  # replace with actual sender email
 
 Outputs:
   ImageBucketName:
